@@ -1,0 +1,1891 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Timezones</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0A0A0F">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20100%20100'%3E%3Crect%20width='100'%20height='100'%20rx='22'%20fill='%230B0B12'/%3E%3Ccircle%20cx='50'%20cy='50'%20r='30'%20fill='none'%20stroke='%233A3550'%20stroke-width='7'/%3E%3Cpath%20d='M50%2020A30%2030%200%200%201%2080%2050'%20fill='none'%20stroke='%238B7CFF'%20stroke-width='7'%20stroke-linecap='round'/%3E%3Ccircle%20cx='50'%20cy='20'%20r='5'%20fill='%23FFFFFF'/%3E%3Ccircle%20cx='80'%20cy='50'%20r='5'%20fill='%238B7CFF'/%3E%3C/svg%3E">
+<style>
+  :root {
+    --bg: #0A0A0F;
+    --accent: #7C6CFF;
+    --accent-soft: rgba(124, 108, 255, 0.14);
+    --accent-border: rgba(124, 108, 255, 0.45);
+    --card-bg: rgba(255, 255, 255, 0.04);
+    --card-border: rgba(255, 255, 255, 0.09);
+    --text: #F4F4F8;
+    --text-dim: rgba(244, 244, 248, 0.55);
+    --text-faint: rgba(244, 244, 248, 0.35);
+    --day-tint: rgba(255, 178, 92, 0.07);
+    --day-edge: rgba(255, 178, 92, 0.22);
+    --night-tint: rgba(96, 140, 255, 0.06);
+    --night-edge: rgba(96, 140, 255, 0.18);
+    --radius: 20px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html { color-scheme: dark; }
+
+  body {
+    background: var(--bg);
+    background-image:
+      radial-gradient(1100px 500px at 15% -10%, rgba(124, 108, 255, 0.10), transparent 60%),
+      radial-gradient(900px 500px at 95% 5%, rgba(124, 108, 255, 0.05), transparent 55%);
+    background-attachment: fixed;
+    color: var(--text);
+    font-family: Inter, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    min-height: 100vh;
+    padding: 40px 24px 80px;
+    padding-top: calc(40px + env(safe-area-inset-top, 0px));
+  }
+
+  .wrap { max-width: 1180px; margin: 0 auto; }
+
+  header.app-header { margin-bottom: 36px; }
+  header.app-header h1 {
+    font-size: 1.7rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+  header.app-header p {
+    margin-top: 6px;
+    color: var(--text-dim);
+    font-size: 0.95rem;
+  }
+
+  h2.section-title {
+    font-size: 1.05rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    color: var(--text);
+    margin: 40px 0 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  h2.section-title::before {
+    content: "";
+    width: 8px; height: 8px;
+    border-radius: 3px;
+    background: var(--accent);
+    box-shadow: 0 0 12px rgba(124, 108, 255, 0.8);
+  }
+
+  /* ---------- Search ---------- */
+  .search-wrap { position: relative; max-width: 480px; }
+
+  .search-input {
+    width: 100%;
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 14px;
+    padding: 13px 16px;
+    color: var(--text);
+    font: inherit;
+    font-size: 0.95rem;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+  .search-input::placeholder { color: var(--text-faint); }
+  .search-input:focus {
+    border-color: var(--accent-border);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+    background: rgba(255, 255, 255, 0.06);
+  }
+
+  .dropdown {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0; right: 0;
+    background: rgba(20, 20, 30, 0.92);
+    border: 1px solid var(--card-border);
+    border-radius: 14px;
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+    overflow: hidden;
+    z-index: 50;
+    display: none;
+  }
+  .dropdown.open { display: block; }
+
+  .dropdown-item {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    padding: 11px 16px;
+    cursor: pointer;
+    transition: background 0.12s;
+  }
+  .dropdown-item.active,
+  .dropdown-item:hover { background: var(--accent-soft); }
+  .dropdown-item .di-name { font-size: 0.92rem; font-weight: 500; }
+  .dropdown-item .di-zone {
+    font-size: 0.72rem;
+    color: var(--text-faint);
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .dropdown-item .di-time {
+    font-size: 0.85rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-dim);
+  }
+  .dropdown-empty {
+    padding: 14px 16px;
+    color: var(--text-faint);
+    font-size: 0.85rem;
+  }
+
+  /* ---------- Board ---------- */
+  .board {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 18px;
+    margin-top: 20px;
+  }
+
+  .empty-hint {
+    color: var(--text-faint);
+    font-size: 0.9rem;
+    padding: 8px 2px;
+  }
+
+  .card {
+    position: relative;
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius);
+    padding: 22px 22px 20px;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    box-shadow: 0 18px 44px rgba(0, 0, 0, 0.35);
+    transition: transform 0.25s ease, opacity 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+    overflow: hidden;
+  }
+  .card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    border-radius: inherit;
+    transition: background 0.6s;
+  }
+  .card.is-day::before {
+    background: linear-gradient(160deg, var(--day-tint), transparent 55%);
+  }
+  .card.is-day { border-color: var(--day-edge); }
+  .card.is-night::before {
+    background: linear-gradient(160deg, var(--night-tint), transparent 55%);
+  }
+  .card.is-night { border-color: var(--night-edge); }
+
+  .card.home {
+    border-color: var(--accent-border);
+    box-shadow: 0 18px 44px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(124, 108, 255, 0.18), 0 0 36px rgba(124, 108, 255, 0.10);
+  }
+
+  .card:hover { transform: translateY(-2px); }
+
+  .card.adding { opacity: 0; transform: scale(0.94) translateY(8px); }
+  .card.removing { opacity: 0; transform: scale(0.92); }
+  .card.dragging { opacity: 0.35; }
+  .card.pulse { box-shadow: 0 0 0 3px var(--accent-border), 0 18px 44px rgba(0,0,0,0.35); }
+
+  .card-top {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .card-titles { flex: 1; min-width: 0; }
+  .card-city {
+    font-size: 1.05rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .card-country { color: var(--text-dim); font-weight: 400; }
+  .card-zone {
+    font-size: 0.7rem;
+    color: var(--text-faint);
+    margin-top: 3px;
+    letter-spacing: 0.02em;
+  }
+
+  .home-badge {
+    font-size: 0.65rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent);
+    background: var(--accent-soft);
+    border: 1px solid var(--accent-border);
+    padding: 3px 8px;
+    border-radius: 999px;
+    align-self: center;
+  }
+
+  .daynight-icon { width: 20px; height: 20px; flex: none; align-self: center; opacity: 0.85; }
+  .daynight-icon .sun, .daynight-icon .moon { display: none; }
+  .card.is-day .daynight-icon .sun { display: block; stroke: #FFB25C; fill: none; }
+  .card.is-night .daynight-icon .moon { display: block; fill: #9DB8FF; }
+
+  .remove-btn {
+    flex: none;
+    align-self: center;
+    position: relative;
+    width: 26px; height: 26px;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--text-faint);
+    font-size: 1.05rem;
+    line-height: 1;
+    cursor: pointer;
+    transition: color 0.15s, background 0.15s, border-color 0.15s;
+  }
+  .remove-btn:hover {
+    color: var(--text);
+    background: rgba(255, 255, 255, 0.07);
+    border-color: var(--card-border);
+  }
+  /* 42px effective tap target around the 26px visual button */
+  .remove-btn::after { content: ""; position: absolute; inset: -8px; }
+
+  .card-clock {
+    font-size: 2.7rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    font-variant-numeric: tabular-nums;
+    margin: 16px 0 4px;
+    line-height: 1;
+  }
+  .card-clock .sec {
+    font-size: 1.5rem;
+    font-weight: 500;
+    color: var(--text-dim);
+  }
+  .card-clock .colon { animation: colonPulse 2s ease-in-out infinite; }
+  @keyframes colonPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.45; }
+  }
+
+  .card-date { color: var(--text-dim); font-size: 0.9rem; }
+
+  .card-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-top: 16px;
+    font-size: 0.78rem;
+  }
+  .chip {
+    padding: 4px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--card-border);
+    background: rgba(255, 255, 255, 0.03);
+    color: var(--text-dim);
+    font-variant-numeric: tabular-nums;
+  }
+  .chip.dst {
+    color: #FFC98A;
+    border-color: rgba(255, 178, 92, 0.35);
+    background: rgba(255, 178, 92, 0.08);
+    font-weight: 600;
+    letter-spacing: 0.05em;
+  }
+  .chip.dayshift {
+    color: var(--accent);
+    border-color: var(--accent-border);
+    background: var(--accent-soft);
+    font-weight: 600;
+  }
+  .diff-label { color: var(--text-faint); font-variant-numeric: tabular-nums; }
+
+  /* ---------- Converter ---------- */
+  .converter {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius);
+    padding: 24px;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    box-shadow: 0 18px 44px rgba(0, 0, 0, 0.35);
+  }
+
+  .converter-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: flex-end;
+  }
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field label {
+    font-size: 0.72rem;
+    color: var(--text-faint);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    font-weight: 600;
+  }
+  .field .search-wrap { min-width: 260px; }
+
+  .time-input, .date-input {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--card-border);
+    border-radius: 14px;
+    padding: 12px 14px;
+    color: var(--text);
+    font: inherit;
+    font-size: 0.95rem;
+    font-variant-numeric: tabular-nums;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .time-input:focus, .date-input:focus {
+    border-color: var(--accent-border);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+
+  .now-btn {
+    background: var(--accent-soft);
+    border: 1px solid var(--accent-border);
+    color: var(--accent);
+    font: inherit;
+    font-size: 0.9rem;
+    font-weight: 600;
+    border-radius: 14px;
+    padding: 12px 20px;
+    cursor: pointer;
+    transition: background 0.15s, transform 0.15s;
+  }
+  .now-btn:hover { background: rgba(124, 108, 255, 0.24); }
+  .now-btn:active { transform: scale(0.97); }
+
+  .converter-results { margin-top: 22px; display: grid; gap: 8px; }
+  .conv-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 13px 16px;
+    border: 1px solid var(--card-border);
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.025);
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .conv-row:hover { background: rgba(255, 255, 255, 0.045); }
+  .conv-row.home-row { border-color: var(--accent-border); background: var(--accent-soft); }
+  .conv-name { flex: 1; min-width: 0; }
+  .conv-name .cn-city { font-size: 0.92rem; font-weight: 600; }
+  .conv-name .cn-zone { font-size: 0.68rem; color: var(--text-faint); margin-top: 2px; }
+  .conv-date { font-size: 0.78rem; color: var(--text-dim); text-align: right; }
+  .conv-time {
+    font-size: 1.35rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    min-width: 88px;
+    text-align: right;
+  }
+  .conv-hint { color: var(--text-faint); font-size: 0.85rem; padding: 6px 2px; }
+
+  /* ---------- Timeline ---------- */
+  .timeline-panel, .planner-panel {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius);
+    padding: 20px;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    box-shadow: 0 18px 44px rgba(0, 0, 0, 0.35);
+  }
+  .tl-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+  .tl-hint { flex: 1; min-width: 200px; font-size: 0.78rem; color: var(--text-faint); }
+  .now-btn.small { padding: 8px 14px; font-size: 0.8rem; border-radius: 11px; }
+  .ghost-btn {
+    background: transparent;
+    border: 1px solid var(--card-border);
+    color: var(--text-dim);
+    font: inherit; font-size: 0.8rem; font-weight: 600;
+    border-radius: 11px; padding: 8px 14px; cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+  .ghost-btn:hover { background: rgba(255, 255, 255, 0.06); color: var(--text); }
+
+  .tl-scroll { overflow-x: auto; position: relative; padding-bottom: 6px; }
+  .tl-content { position: relative; user-select: none; -webkit-user-select: none; touch-action: pan-x; }
+  .tl-row { position: relative; height: 44px; }
+  .tl-row + .tl-row { margin-top: 6px; }
+  .tl-strip {
+    position: absolute; inset: 0;
+    border-radius: 10px; overflow: hidden;
+    border: 1px solid var(--card-border);
+    background: rgba(255, 255, 255, 0.02);
+  }
+  .tl-cell { position: absolute; top: 0; bottom: 0; border-left: 1px solid rgba(255, 255, 255, 0.03); }
+  .tl-cell.c-night { background: rgba(4, 4, 10, 0.5); }
+  .tl-cell.c-shoulder { background: rgba(124, 108, 255, 0.045); }
+  .tl-cell.c-work { background: rgba(124, 108, 255, 0.13); }
+  .tl-cell.day-start { border-left: 1px solid rgba(255, 255, 255, 0.28); }
+  .tl-hour-label { position: absolute; top: 4px; left: 5px; font-size: 0.6rem; color: var(--text-faint); font-variant-numeric: tabular-nums; }
+  .tl-day-label { position: absolute; bottom: 4px; left: 5px; font-size: 0.6rem; color: var(--text-dim); white-space: nowrap; }
+  .tl-row-label {
+    position: sticky; left: 6px; z-index: 5;
+    display: inline-block; margin-top: 11px; padding: 3px 9px;
+    font-size: 0.72rem; font-weight: 600; color: var(--text);
+    background: rgba(16, 16, 26, 0.85);
+    border: 1px solid var(--card-border); border-radius: 999px;
+    pointer-events: none; white-space: nowrap;
+  }
+  .tl-row.tl-home .tl-row-label { border-color: var(--accent-border); color: var(--accent); }
+
+  .tl-cursor { position: absolute; top: 0; bottom: 0; left: 0; width: 0; z-index: 8; pointer-events: none; }
+  .tl-cursor-line {
+    position: absolute; top: 0; bottom: 0; left: -1px; width: 2px;
+    background: var(--accent); border-radius: 1px;
+    box-shadow: 0 0 12px rgba(124, 108, 255, 0.75);
+  }
+  .tl-cursor-hit { position: absolute; top: 0; bottom: 0; left: -9px; width: 18px; pointer-events: auto; cursor: ew-resize; touch-action: none; }
+  .tl-cursor-tag {
+    position: absolute; left: 8px; transform: translateY(-50%);
+    background: rgba(18, 18, 28, 0.95);
+    border: 1px solid var(--accent-border); border-radius: 8px;
+    padding: 2px 8px; font-size: 0.68rem; font-variant-numeric: tabular-nums;
+    white-space: nowrap; color: var(--text); pointer-events: none;
+  }
+  .tl-cursor.flip .tl-cursor-tag { left: auto; right: 8px; }
+  .tl-selection {
+    position: absolute; top: 0; bottom: 0; display: none;
+    background: rgba(124, 108, 255, 0.12);
+    border-left: 1px solid var(--accent-border);
+    border-right: 1px solid var(--accent-border);
+    z-index: 4; pointer-events: none;
+  }
+
+  /* ---------- Meeting planner ---------- */
+  .pl-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+  .pl-head label { font-size: 0.72rem; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; }
+  .pl-hint { font-size: 0.8rem; color: var(--text-faint); }
+  .time-input.small { padding: 8px 10px; font-size: 0.85rem; border-radius: 10px; }
+  .pl-summary { font-size: 0.92rem; color: var(--text); margin-bottom: 12px; }
+  .pl-bar-wrap { position: relative; }
+  .pl-bar {
+    position: relative; height: 30px;
+    border-radius: 9px; overflow: hidden;
+    border: 1px solid var(--card-border);
+    background: rgba(255, 255, 255, 0.02);
+  }
+  .ov-seg { position: absolute; top: 0; bottom: 0; cursor: pointer; border-left: 1px solid rgba(10, 10, 16, 0.5); }
+  .ov-seg.ov-none { background: transparent; }
+  .ov-seg.ov-some { background: rgba(124, 108, 255, 0.14); }
+  .ov-seg.ov-most { background: rgba(124, 108, 255, 0.45); }
+  .ov-seg.ov-full { background: rgba(124, 108, 255, 0.9); }
+  .ov-seg:hover { outline: 1px solid var(--accent-border); outline-offset: -1px; }
+  .pl-bar-labels { position: relative; height: 16px; margin-top: 4px; }
+  .pl-bar-labels span { position: absolute; font-size: 0.62rem; color: var(--text-faint); font-variant-numeric: tabular-nums; transform: translateX(2px); }
+  .pl-tooltip {
+    position: absolute; top: 38px; z-index: 30; display: none; min-width: 210px;
+    background: rgba(16, 16, 26, 0.97);
+    border: 1px solid var(--card-border); border-radius: 12px;
+    padding: 10px 12px; box-shadow: 0 18px 44px rgba(0, 0, 0, 0.55);
+  }
+  .tt-title { font-size: 0.72rem; color: var(--text-faint); margin-bottom: 6px; font-variant-numeric: tabular-nums; }
+  .tt-row { display: flex; align-items: center; gap: 8px; padding: 2px 0; font-size: 0.8rem; }
+  .tt-time { margin-left: auto; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+  .mark { position: relative; width: 14px; height: 14px; flex: none; display: inline-block; }
+  .mark-yes::before {
+    content: ""; position: absolute; left: 2px; top: 3px; width: 8px; height: 4px;
+    border-left: 2px solid #8FE3B0; border-bottom: 2px solid #8FE3B0;
+    transform: rotate(-45deg);
+  }
+  .mark-no::before, .mark-no::after {
+    content: ""; position: absolute; left: 6px; top: 2px; width: 2px; height: 10px;
+    border-radius: 1px; background: #EE9090;
+  }
+  .mark-no::before { transform: rotate(45deg); }
+  .mark-no::after { transform: rotate(-45deg); }
+
+  .sel-panel { display: none; margin-top: 14px; border-top: 1px solid var(--card-border); padding-top: 12px; }
+  .sel-panel.open { display: block; }
+  .sel-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .sel-title { flex: 1; font-size: 0.85rem; font-weight: 600; }
+  .sel-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 7px 12px; border: 1px solid var(--card-border); border-radius: 11px;
+    background: rgba(255, 255, 255, 0.025); font-size: 0.84rem;
+  }
+  .sel-row + .sel-row { margin-top: 6px; }
+  .sel-row.home-row { border-color: var(--accent-border); background: var(--accent-soft); }
+  .sel-name { flex: 1; min-width: 0; font-weight: 600; }
+  .sel-range { color: var(--text-dim); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  @media (max-width: 640px) {
+    body { padding: 24px 14px 60px; }
+    .board { grid-template-columns: 1fr; }
+    .card-clock { font-size: 2.4rem; }
+    .field .search-wrap { min-width: 100%; }
+    .converter-controls { align-items: stretch; }
+    .converter-controls .field { flex: 1 1 100%; }
+    .conv-row { flex-wrap: wrap; }
+    .tl-row-label { font-size: 0.66rem; }
+    .tl-cursor-tag { font-size: 0.62rem; padding: 2px 6px; }
+    .sel-row { flex-wrap: wrap; }
+    /* 40px+ touch targets */
+    .remove-btn { width: 32px; height: 32px; }
+    .now-btn.small, .ghost-btn { padding: 11px 16px; }
+    .time-input.small { padding: 11px 12px; }
+    .pl-bar { height: 40px; }
+    .tl-cursor-hit { left: -20px; width: 40px; }
+    .dropdown-item { padding: 13px 16px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="app-header">
+    <h1>Timezones</h1>
+    <p>Live world clocks and instant time conversion, with automatic daylight saving handling.</p>
+  </header>
+
+  <h2 class="section-title">World Clocks</h2>
+  <div class="search-wrap">
+    <input class="search-input" id="add-input" type="text"
+           placeholder="Search a city or country" autocomplete="off" spellcheck="false"
+           aria-label="Search a city or country to add">
+    <div class="dropdown" id="add-dropdown" role="listbox"></div>
+  </div>
+  <div class="board" id="board"></div>
+
+  <h2 class="section-title">Timeline</h2>
+  <div class="timeline-panel">
+    <div class="tl-head">
+      <span class="tl-hint">Drag the line to scrub, double-click a strip to jump, drag across a strip to select a meeting range.</span>
+      <button class="now-btn small" id="tl-now" type="button">Now</button>
+    </div>
+    <div class="tl-scroll" id="tl-scroll">
+      <div class="tl-content" id="tl-content"></div>
+    </div>
+  </div>
+
+  <h2 class="section-title">Meeting Planner</h2>
+  <div class="planner-panel">
+    <div class="pl-head">
+      <label for="wh-start">Working hours</label>
+      <input class="time-input small" id="wh-start" type="time" step="900">
+      <span class="pl-hint">to</span>
+      <input class="time-input small" id="wh-end" type="time" step="900">
+    </div>
+    <div class="pl-summary" id="overlap-summary"></div>
+    <div class="pl-bar-wrap" id="pl-bar-wrap">
+      <div class="pl-bar" id="pl-bar"></div>
+      <div class="pl-bar-labels" id="pl-bar-labels"></div>
+      <div class="pl-tooltip" id="pl-tooltip"></div>
+    </div>
+    <div class="sel-panel" id="sel-panel">
+      <div class="sel-head">
+        <span class="sel-title">Selected range</span>
+        <button class="now-btn small" id="sel-copy" type="button">Copy</button>
+        <button class="ghost-btn" id="sel-clear" type="button">Clear</button>
+      </div>
+      <div id="sel-rows"></div>
+    </div>
+  </div>
+
+  <h2 class="section-title">Convert a Time</h2>
+  <div class="converter">
+    <div class="converter-controls">
+      <div class="field">
+        <label for="conv-input">From zone</label>
+        <div class="search-wrap">
+          <input class="search-input" id="conv-input" type="text"
+                 placeholder="Search a city or country" autocomplete="off" spellcheck="false"
+                 aria-label="Search a source zone">
+          <div class="dropdown" id="conv-dropdown" role="listbox"></div>
+        </div>
+      </div>
+      <div class="field">
+        <label for="conv-time">Time</label>
+        <input class="time-input" id="conv-time" type="time" step="60">
+      </div>
+      <div class="field">
+        <label for="conv-date">Date</label>
+        <input class="date-input" id="conv-date" type="date">
+      </div>
+      <button class="now-btn" id="conv-now" type="button">Now</button>
+    </div>
+    <div class="converter-results" id="conv-results"></div>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+/* ================================================================
+   DATASET: curated aliases layered over the full IANA zone list
+   (the list itself is generated at startup from Intl)
+   ================================================================ */
+// Country and territory names -> their main IANA zone.
+const COUNTRY_ALIASES = [
+  // Europe
+  ["United Kingdom", "Europe/London"], ["England", "Europe/London"],
+  ["Ireland", "Europe/Dublin"], ["France", "Europe/Paris"],
+  ["Germany", "Europe/Berlin"], ["Spain", "Europe/Madrid"],
+  ["Portugal", "Europe/Lisbon"], ["Italy", "Europe/Rome"],
+  ["Netherlands", "Europe/Amsterdam"], ["Belgium", "Europe/Brussels"],
+  ["Luxembourg", "Europe/Luxembourg"], ["Switzerland", "Europe/Zurich"],
+  ["Austria", "Europe/Vienna"], ["Denmark", "Europe/Copenhagen"],
+  ["Norway", "Europe/Oslo"], ["Sweden", "Europe/Stockholm"],
+  ["Finland", "Europe/Helsinki"], ["Iceland", "Atlantic/Reykjavik"],
+  ["Poland", "Europe/Warsaw"], ["Czech Republic", "Europe/Prague"],
+  ["Slovakia", "Europe/Bratislava"], ["Hungary", "Europe/Budapest"],
+  ["Slovenia", "Europe/Ljubljana"], ["Croatia", "Europe/Zagreb"],
+  ["Serbia", "Europe/Belgrade"], ["Bosnia and Herzegovina", "Europe/Sarajevo"],
+  ["Albania", "Europe/Tirane"], ["Romania", "Europe/Bucharest"],
+  ["Bulgaria", "Europe/Sofia"], ["Greece", "Europe/Athens"],
+  ["Ukraine", "Europe/Kyiv"], ["Belarus", "Europe/Minsk"],
+  ["Lithuania", "Europe/Vilnius"], ["Latvia", "Europe/Riga"],
+  ["Estonia", "Europe/Tallinn"], ["Moldova", "Europe/Chisinau"],
+  ["Russia", "Europe/Moscow"], ["Turkey", "Europe/Istanbul"],
+  ["Malta", "Europe/Malta"], ["Cyprus", "Asia/Nicosia"],
+  // Americas
+  ["United States", "America/New_York"], ["USA", "America/New_York"],
+  ["Canada", "America/Toronto"], ["Mexico", "America/Mexico_City"],
+  ["Guatemala", "America/Guatemala"], ["Honduras", "America/Tegucigalpa"],
+  ["El Salvador", "America/El_Salvador"], ["Nicaragua", "America/Managua"],
+  ["Costa Rica", "America/Costa_Rica"], ["Panama", "America/Panama"],
+  ["Cuba", "America/Havana"], ["Jamaica", "America/Jamaica"],
+  ["Haiti", "America/Port-au-Prince"], ["Dominican Republic", "America/Santo_Domingo"],
+  ["Colombia", "America/Bogota"], ["Venezuela", "America/Caracas"],
+  ["Ecuador", "America/Guayaquil"], ["Peru", "America/Lima"],
+  ["Bolivia", "America/La_Paz"], ["Paraguay", "America/Asuncion"],
+  ["Chile", "America/Santiago"], ["Argentina", "America/Argentina/Buenos_Aires"],
+  ["Uruguay", "America/Montevideo"], ["Brazil", "America/Sao_Paulo"],
+  // Asia and Middle East
+  ["Japan", "Asia/Tokyo"], ["South Korea", "Asia/Seoul"],
+  ["China", "Asia/Shanghai"], ["Taiwan", "Asia/Taipei"],
+  ["Hong Kong", "Asia/Hong_Kong"], ["Macau", "Asia/Macau"],
+  ["Mongolia", "Asia/Ulaanbaatar"], ["Vietnam", "Asia/Ho_Chi_Minh"],
+  ["Thailand", "Asia/Bangkok"], ["Laos", "Asia/Vientiane"],
+  ["Cambodia", "Asia/Phnom_Penh"], ["Myanmar", "Asia/Yangon"],
+  ["Malaysia", "Asia/Kuala_Lumpur"], ["Singapore", "Asia/Singapore"],
+  ["Indonesia", "Asia/Jakarta"], ["Philippines", "Asia/Manila"],
+  ["Brunei", "Asia/Brunei"], ["India", "Asia/Kolkata"],
+  ["Sri Lanka", "Asia/Colombo"], ["Bangladesh", "Asia/Dhaka"],
+  ["Nepal", "Asia/Kathmandu"], ["Bhutan", "Asia/Thimphu"],
+  ["Maldives", "Indian/Maldives"], ["Pakistan", "Asia/Karachi"],
+  ["Afghanistan", "Asia/Kabul"], ["Iran", "Asia/Tehran"],
+  ["Iraq", "Asia/Baghdad"], ["Israel", "Asia/Jerusalem"],
+  ["Jordan", "Asia/Amman"], ["Lebanon", "Asia/Beirut"],
+  ["Syria", "Asia/Damascus"], ["Saudi Arabia", "Asia/Riyadh"],
+  ["United Arab Emirates", "Asia/Dubai"], ["UAE", "Asia/Dubai"],
+  ["Qatar", "Asia/Qatar"], ["Kuwait", "Asia/Kuwait"],
+  ["Bahrain", "Asia/Bahrain"], ["Oman", "Asia/Muscat"],
+  ["Yemen", "Asia/Aden"], ["Azerbaijan", "Asia/Baku"],
+  ["Georgia", "Asia/Tbilisi"], ["Armenia", "Asia/Yerevan"],
+  ["Kazakhstan", "Asia/Almaty"], ["Uzbekistan", "Asia/Tashkent"],
+  ["Kyrgyzstan", "Asia/Bishkek"], ["Tajikistan", "Asia/Dushanbe"],
+  ["Turkmenistan", "Asia/Ashgabat"],
+  // Africa
+  ["Egypt", "Africa/Cairo"], ["Morocco", "Africa/Casablanca"],
+  ["Algeria", "Africa/Algiers"], ["Tunisia", "Africa/Tunis"],
+  ["Libya", "Africa/Tripoli"], ["Sudan", "Africa/Khartoum"],
+  ["Nigeria", "Africa/Lagos"], ["Ghana", "Africa/Accra"],
+  ["Senegal", "Africa/Dakar"], ["Ivory Coast", "Africa/Abidjan"],
+  ["Cote d'Ivoire", "Africa/Abidjan"], ["Kenya", "Africa/Nairobi"],
+  ["Ethiopia", "Africa/Addis_Ababa"], ["Tanzania", "Africa/Dar_es_Salaam"],
+  ["Uganda", "Africa/Kampala"], ["Rwanda", "Africa/Kigali"],
+  ["South Africa", "Africa/Johannesburg"], ["Zimbabwe", "Africa/Harare"],
+  ["Zambia", "Africa/Lusaka"], ["Mozambique", "Africa/Maputo"],
+  ["Angola", "Africa/Luanda"], ["Cameroon", "Africa/Douala"],
+  ["DR Congo", "Africa/Kinshasa"], ["Madagascar", "Indian/Antananarivo"],
+  ["Mauritius", "Indian/Mauritius"],
+  // Oceania
+  ["Australia", "Australia/Sydney"], ["New Zealand", "Pacific/Auckland"],
+  ["Fiji", "Pacific/Fiji"], ["Papua New Guinea", "Pacific/Port_Moresby"],
+  ["Samoa", "Pacific/Apia"], ["New Caledonia", "Pacific/Noumea"]
+];
+
+// Common timezone abbreviations -> a representative zone.
+const ZONE_ABBREVIATIONS = [
+  ["CET", "Europe/Paris"], ["CEST", "Europe/Paris"],
+  ["WET", "Europe/Lisbon"], ["EET", "Europe/Athens"],
+  ["BST", "Europe/London"], ["MSK", "Europe/Moscow"],
+  ["GMT", "Etc/GMT"],
+  ["EST", "America/New_York"], ["EDT", "America/New_York"],
+  ["CST", "America/Chicago"], ["CDT", "America/Chicago"],
+  ["MST", "America/Denver"], ["MDT", "America/Denver"],
+  ["PST", "America/Los_Angeles"], ["PDT", "America/Los_Angeles"],
+  ["AKST", "America/Anchorage"], ["HST", "Pacific/Honolulu"],
+  ["AST", "America/Halifax"],
+  ["IST", "Asia/Kolkata"], ["JST", "Asia/Tokyo"],
+  ["KST", "Asia/Seoul"], ["HKT", "Asia/Hong_Kong"],
+  ["SGT", "Asia/Singapore"], ["ICT", "Asia/Bangkok"],
+  ["GST", "Asia/Dubai"],
+  ["AEST", "Australia/Sydney"], ["AEDT", "Australia/Sydney"],
+  ["ACST", "Australia/Adelaide"], ["AWST", "Australia/Perth"],
+  ["NZST", "Pacific/Auckland"], ["NZDT", "Pacific/Auckland"]
+];
+
+/* ================================================================
+   TIMEZONE MATH (all via Intl, no hardcoded offsets)
+   ================================================================ */
+const mathFmtCache = Object.create(null);
+function mathFmt(zone) {
+  if (!mathFmtCache[zone]) {
+    mathFmtCache[zone] = new Intl.DateTimeFormat("en-US", {
+      timeZone: zone, hourCycle: "h23",
+      year: "numeric", month: "2-digit", day: "2-digit",
+      hour: "2-digit", minute: "2-digit", second: "2-digit"
+    });
+  }
+  return mathFmtCache[zone];
+}
+
+const dateFmtCache = Object.create(null);
+function dateFmt(zone) {
+  if (!dateFmtCache[zone]) {
+    dateFmtCache[zone] = new Intl.DateTimeFormat("en-US", {
+      timeZone: zone, weekday: "long", month: "long", day: "numeric"
+    });
+  }
+  return dateFmtCache[zone];
+}
+
+// Wall-clock components of an instant, seen from a zone.
+function zoneParts(zone, date) {
+  const raw = {};
+  for (const p of mathFmt(zone).formatToParts(date)) raw[p.type] = p.value;
+  return {
+    y: +raw.year, mo: +raw.month, d: +raw.day,
+    h: +raw.hour, mi: +raw.minute, s: +raw.second
+  };
+}
+
+// Current UTC offset of a zone at a given instant, in minutes.
+function getOffsetMinutes(zone, date) {
+  const p = zoneParts(zone, date);
+  const asUTC = Date.UTC(p.y, p.mo - 1, p.d, p.h, p.mi, p.s);
+  return Math.round((asUTC - date.getTime()) / 60000);
+}
+
+// DST detection: compare the zone's offset in January vs July.
+const dstCache = Object.create(null);
+function dstBounds(zone, year) {
+  const c = dstCache[zone];
+  if (c && c.year === year) return c;
+  const jan = getOffsetMinutes(zone, new Date(Date.UTC(year, 0, 1, 12)));
+  const jul = getOffsetMinutes(zone, new Date(Date.UTC(year, 6, 1, 12)));
+  return (dstCache[zone] = { year, jan, jul });
+}
+function isDSTActive(zone, date, currentOffset) {
+  const { jan, jul } = dstBounds(zone, date.getUTCFullYear());
+  return jan !== jul && currentOffset === Math.max(jan, jul);
+}
+
+// A wall-clock time in a zone -> UTC timestamp (ms).
+// Guess with the offset near that date, then verify by formatting
+// back and adjusting, so DST transition days resolve exactly.
+function wallToUTC(zone, y, mo, d, h, mi) {
+  const desired = Date.UTC(y, mo - 1, d, h, mi);
+  let ts = desired - getOffsetMinutes(zone, new Date(desired)) * 60000;
+  for (let i = 0; i < 2; i++) {
+    const off = getOffsetMinutes(zone, new Date(ts));
+    const candidate = desired - off * 60000;
+    if (candidate === ts) break;
+    ts = candidate;
+  }
+  return ts;
+}
+
+function pad2(n) { return String(n).padStart(2, "0"); }
+
+function fmtOffset(mins) {
+  const sign = mins < 0 ? "-" : "+";
+  const a = Math.abs(mins);
+  const h = Math.floor(a / 60), m = a % 60;
+  return "UTC" + sign + h + (m ? ":" + pad2(m) : "");
+}
+
+function fmtHomeDiff(mins) {
+  if (mins === 0) return "Same time as home";
+  const sign = mins < 0 ? "-" : "+";
+  const a = Math.abs(mins);
+  const h = Math.floor(a / 60), m = a % 60;
+  return sign + h + "h" + (m ? pad2(m) : "") + " from home";
+}
+
+// Serial day number of a wall-clock date, for +1/-1 day comparisons.
+function dayNumber(p) { return Date.UTC(p.y, p.mo - 1, p.d) / 86400000; }
+
+/* ---------- meeting planner math (pure, Intl-based) ---------- */
+function parseHM(s) {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(s || "");
+  return m ? +m[1] * 60 + +m[2] : null;
+}
+function inWorkingWindow(zone, t, wsMin, weMin) {
+  if (wsMin === weMin) return false;
+  const p = zoneParts(zone, new Date(t));
+  const m = p.h * 60 + p.mi;
+  return wsMin < weMin ? m >= wsMin && m < weMin : m >= wsMin || m < weMin;
+}
+// For each hour of the home zone's current day: the instant it starts and
+// how many of the given zones are inside working hours at that instant.
+function overlapForDay(zoneIds, homeZone, ref, wsMin, weMin) {
+  const hp = zoneParts(homeZone, ref);
+  const bounds = [];
+  for (let H = 0; H <= 24; H++) bounds.push(wallToUTC(homeZone, hp.y, hp.mo, hp.d, H, 0));
+  const samples = [], counts = [];
+  for (let H = 0; H < 24; H++) {
+    samples.push(bounds[H]);
+    counts.push(zoneIds.filter(z => inWorkingWindow(z, bounds[H], wsMin, weMin)).length);
+  }
+  return { bounds, samples, counts };
+}
+// Consecutive-hour windows holding the day's maximum overlap, longest first.
+function bestWindows(counts) {
+  const max = Math.max(0, ...counts);
+  const wins = [];
+  if (max > 0) {
+    let s = -1;
+    for (let h = 0; h <= 24; h++) {
+      const on = h < 24 && counts[h] === max;
+      if (on && s < 0) s = h;
+      if (!on && s >= 0) { wins.push([s, h]); s = -1; }
+    }
+    wins.sort((a, b) => (b[1] - b[0]) - (a[1] - a[0]));
+  }
+  return { max, wins };
+}
+
+/* ================================================================
+   SEARCH INDEX (built once at startup, no per-keystroke rebuilds)
+   ================================================================ */
+function norm(s) {
+  return s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+
+// User-facing "UTC+7" maps to IANA "Etc/GMT-7": Etc/GMT signs are inverted.
+function etcZoneForOffset(hours) {
+  if (hours === 0) return "Etc/GMT";
+  return "Etc/GMT" + (hours > 0 ? "-" + hours : "+" + (-hours));
+}
+function utcLabelForOffset(hours) {
+  return hours === 0 ? "UTC" : "UTC" + (hours > 0 ? "+" + hours : String(hours));
+}
+
+// Friendly rendering of a zone id; raw Etc/GMT names are never shown.
+function displayZone(zone) {
+  if (zone === "UTC" || zone === "Etc/UTC" || zone === "Etc/GMT" || zone === "Etc/Greenwich") return "UTC";
+  const m = /^Etc\/GMT([+-])(\d+)$/.exec(zone);
+  if (m) return utcLabelForOffset((m[1] === "+" ? -1 : 1) * +m[2]);
+  return zone;
+}
+
+// The engine's canonical id for a zone (e.g. Asia/Ho_Chi_Minh -> Asia/Saigon
+// on ICU builds that still canonicalize to legacy names).
+function canonicalZone(zone) {
+  try { return mathFmt(zone).resolvedOptions().timeZone; } catch (err) { return zone; }
+}
+
+const INDEX = (() => {
+  const entries = [];
+  const byZone = new Map();
+  const add = e => { entries.push(e); byZone.set(e.zone, e); return e; };
+
+  // Find the entry for a zone, following Intl canonicalization. When the
+  // requested id is a modern spelling of a legacy entry, upgrade the entry
+  // to the modern id and keep the old name searchable as an alias.
+  const resolve = zone => {
+    let e = byZone.get(zone);
+    if (e) return e;
+    const canon = canonicalZone(zone);
+    e = byZone.get(canon);
+    if (e && zone !== canon) {
+      const oldName = e.name;
+      e.name = zone.split("/").pop().replace(/_/g, " ");
+      if (norm(oldName) !== norm(e.name)) e.aliases.push(norm(oldName));
+      e.zone = zone;
+      byZone.set(zone, e);
+    }
+    return e;
+  };
+
+  // 1. Every zone the browser knows, with auto-generated labels:
+  //    last segment as the name, first segment as the region.
+  let ianaZones = [];
+  try {
+    if (typeof Intl.supportedValuesOf === "function") {
+      ianaZones = Intl.supportedValuesOf("timeZone");
+    }
+  } catch (err) { /* fall back to curated zones below */ }
+  if (!ianaZones.length) {
+    ianaZones = [...new Set(COUNTRY_ALIASES.concat(ZONE_ABBREVIATIONS).map(a => a[1]))];
+  }
+  for (const zone of ianaZones) {
+    // Etc/* and bare ids are covered by the explicit UTC entries below.
+    if (zone.startsWith("Etc/") || !zone.includes("/")) continue;
+    if (!validZone(zone)) continue;
+    const segs = zone.split("/");
+    add({
+      name: segs[segs.length - 1].replace(/_/g, " "),
+      country: segs[0].replace(/_/g, " "),
+      zone, aliases: [], order: 500, hasCountry: false
+    });
+  }
+
+  // 2. UTC itself plus every whole-hour offset from UTC-12 to UTC+14.
+  for (let off = -12; off <= 14; off++) {
+    const zone = etcZoneForOffset(off);
+    if (!validZone(zone)) continue;
+    add({
+      name: utcLabelForOffset(off),
+      country: "Fixed offset",
+      zone,
+      aliases: off === 0
+        ? ["gmt", "greenwich mean time", "zulu", "utc+0", "utc-0", "+0", "-0"]
+        : [(off > 0 ? "+" : "") + off],
+      order: off === 0 ? 0 : (off > 0 ? off : 14 - off), // UTC, +1..+14, then -1..-12
+      hasCountry: true
+    });
+  }
+
+  // 3. Curated aliases merged in: an alias resolving to a zone already
+  //    listed extends that entry, so both terms find one merged result.
+  for (const [label, zone] of COUNTRY_ALIASES) {
+    if (!validZone(zone)) continue;
+    let e = resolve(zone);
+    if (!e) {
+      e = add({ name: label, country: zone.split("/")[0], zone, aliases: [], order: 500, hasCountry: false });
+    }
+    if (!e.hasCountry) { e.country = label; e.hasCountry = true; }
+    else if (norm(e.country) !== norm(label) && norm(e.name) !== norm(label)) {
+      e.aliases.push(norm(label));
+    }
+  }
+  for (const [abbr, zone] of ZONE_ABBREVIATIONS) {
+    if (!validZone(zone)) continue;
+    const e = resolve(zone);
+    if (!e) {
+      add({ name: abbr, country: zone.split("/")[0], zone, aliases: [], order: 500, hasCountry: true });
+      continue;
+    }
+    const a = norm(abbr);
+    if (norm(e.name) !== a && !e.aliases.includes(a)) e.aliases.push(a);
+  }
+
+  for (const e of entries) {
+    e.nName = norm(e.name);
+    e.nCountry = norm(e.country);
+    e.nZone = norm(e.zone.replace(/[_/]/g, " "));
+  }
+  return entries;
+})();
+
+function searchPlaces(query) {
+  const q = norm(query.trim());
+  if (!q) return [];
+  const scored = [];
+  for (const e of INDEX) {
+    let score = -1;
+    if (e.nName.startsWith(q)) score = 0;
+    else if (e.nCountry.startsWith(q) || e.aliases.some(a => a.startsWith(q))) score = 1;
+    else if (e.nName.includes(q) || e.nCountry.includes(q) || e.nZone.includes(q) ||
+             e.aliases.some(a => a.includes(q))) score = 2;
+    if (score >= 0) scored.push({ e, score });
+  }
+  scored.sort((a, b) =>
+    a.score - b.score || a.e.order - b.e.order || a.e.name.localeCompare(b.e.name));
+  return scored.slice(0, 12).map(s => s.e);
+}
+
+// Secondary line for an entry: its country if known, else its region;
+// suppressed when it would just repeat the name.
+function subtitleFor(entry) {
+  return entry.country && norm(entry.country) !== norm(entry.name) ? entry.country : "";
+}
+
+function labelForZone(zone) {
+  const hit = INDEX.find(e => e.zone === zone) ||
+              INDEX.find(e => canonicalZone(e.zone) === canonicalZone(zone));
+  if (hit) return { name: hit.name, country: subtitleFor(hit) };
+  const friendly = displayZone(zone);
+  if (friendly !== zone || !zone.includes("/")) return { name: friendly, country: "" };
+  return { name: zone.split("/").pop().replace(/_/g, " "), country: zone.split("/")[0] };
+}
+
+/* ================================================================
+   STATE + PERSISTENCE
+   ================================================================ */
+const HOME_ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+const STORAGE_KEY = "tz-board-zones-v1";
+
+function loadZones() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const list = JSON.parse(raw);
+      if (Array.isArray(list)) {
+        return list.filter(z => z && typeof z.zone === "string" && validZone(z.zone));
+      }
+    }
+  } catch (err) { /* storage unavailable or corrupt: fall through */ }
+  return null;
+}
+function saveZones() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(zones));
+  } catch (err) { /* storage unavailable: ignore */ }
+}
+function validZone(zone) {
+  try { mathFmt(zone); return true; } catch (err) { return false; }
+}
+
+let zones = loadZones();
+if (!zones) {
+  zones = [
+    { name: "London", country: "United Kingdom", zone: "Europe/London" },
+    { name: "New York", country: "United States", zone: "America/New_York" },
+    { name: "Tokyo", country: "Japan", zone: "Asia/Tokyo" }
+  ].filter(z => z.zone !== HOME_ZONE);
+}
+
+// Home first, then the board zones in their current order.
+function boardTargets() {
+  const home = labelForZone(HOME_ZONE);
+  return [{ name: home.name, country: home.country, zone: HOME_ZONE, home: true }]
+    .concat(zones.filter(z => z.zone !== HOME_ZONE).map(z => ({ ...z, home: false })));
+}
+
+/* ================================================================
+   WORLD CLOCK BOARD
+   ================================================================ */
+const boardEl = document.getElementById("board");
+const cardRefs = [];   // { zone, els: {...}, cardEl, data }
+
+const SUN_MOON_SVG =
+  '<svg class="daynight-icon" viewBox="0 0 24 24" aria-hidden="true">' +
+  '<g class="sun" stroke-width="1.8" stroke-linecap="round">' +
+  '<circle cx="12" cy="12" r="4.2"/>' +
+  '<line x1="12" y1="2.5" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="21.5"/>' +
+  '<line x1="2.5" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="21.5" y2="12"/>' +
+  '<line x1="5.3" y1="5.3" x2="7" y2="7"/><line x1="17" y1="17" x2="18.7" y2="18.7"/>' +
+  '<line x1="5.3" y1="18.7" x2="7" y2="17"/><line x1="17" y1="7" x2="18.7" y2="5.3"/>' +
+  '</g>' +
+  '<path class="moon" d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/>' +
+  '</svg>';
+
+function buildCard(item, isHome) {
+  const card = document.createElement("article");
+  card.className = "card adding" + (isHome ? " home" : "");
+  card.dataset.zone = item.zone;
+  if (!isHome) card.draggable = true;
+
+  const countryHtml = item.country && norm(item.country) !== norm(item.name)
+    ? ' <span class="card-country">' + escapeHtml(item.country) + "</span>"
+    : "";
+  card.innerHTML =
+    '<div class="card-top">' +
+      '<div class="card-titles">' +
+        '<div class="card-city">' + escapeHtml(item.name) + countryHtml + "</div>" +
+        '<div class="card-zone">' + escapeHtml(displayZone(item.zone)) + "</div>" +
+      "</div>" +
+      SUN_MOON_SVG +
+      (isHome
+        ? '<span class="home-badge">Home</span>'
+        : '<button class="remove-btn" type="button" aria-label="Remove ' + escapeHtml(item.name) + '">&times;</button>') +
+    "</div>" +
+    '<div class="card-clock">' +
+      '<span class="hh"></span><span class="colon">:</span><span class="mm"></span>' +
+      '<span class="sec"><span class="colon">:</span><span class="ss"></span></span>' +
+    "</div>" +
+    '<div class="card-date"></div>' +
+    '<div class="card-meta">' +
+      '<span class="chip offset"></span>' +
+      '<span class="chip dst" hidden>DST</span>' +
+      '<span class="chip dayshift" hidden></span>' +
+      '<span class="diff-label"></span>' +
+    "</div>";
+
+  const els = {
+    hh: card.querySelector(".hh"),
+    mm: card.querySelector(".mm"),
+    ss: card.querySelector(".ss"),
+    date: card.querySelector(".card-date"),
+    offset: card.querySelector(".offset"),
+    dst: card.querySelector(".dst"),
+    dayshift: card.querySelector(".dayshift"),
+    diff: card.querySelector(".diff-label")
+  };
+
+  if (!isHome) {
+    card.querySelector(".remove-btn").addEventListener("click", () => removeZone(item.zone, card));
+    card.addEventListener("dragstart", onDragStart);
+    card.addEventListener("dragend", onDragEnd);
+  }
+  return { card, els };
+}
+
+function escapeHtml(s) {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+function renderBoard() {
+  boardEl.innerHTML = "";
+  cardRefs.length = 0;
+
+  const items = boardTargets();
+
+  for (const item of items) {
+    const { card, els } = buildCard(item, item.home);
+    boardEl.appendChild(card);
+    cardRefs.push({ zone: item.zone, cardEl: card, els, last: {} });
+    requestAnimationFrame(() => requestAnimationFrame(() => card.classList.remove("adding")));
+  }
+  tickRender(new Date(), true);
+  refreshDerived();
+}
+
+function addZone(entry) {
+  const existing = cardRefs.find(r => r.zone === entry.zone);
+  if (existing) {
+    existing.cardEl.classList.add("pulse");
+    setTimeout(() => existing.cardEl.classList.remove("pulse"), 900);
+    return;
+  }
+  zones.push({ name: entry.name, country: entry.country, zone: entry.zone });
+  saveZones();
+  renderBoard();
+}
+
+function removeZone(zone, cardEl) {
+  cardEl.classList.add("removing");
+  setTimeout(() => {
+    zones = zones.filter(z => z.zone !== zone);
+    saveZones();
+    renderBoard();
+  }, 240);
+}
+
+/* ---------- live tick ---------- */
+let lastSecond = -1;
+function tickRender(now, force) {
+  const homeOffset = getOffsetMinutes(HOME_ZONE, now);
+  const homeParts = zoneParts(HOME_ZONE, now);
+  const homeDay = dayNumber(homeParts);
+
+  for (const ref of cardRefs) {
+    const isHomeCard = ref.zone === HOME_ZONE && ref.cardEl.classList.contains("home");
+    const p = isHomeCard ? homeParts : zoneParts(ref.zone, now);
+    const offset = isHomeCard ? homeOffset : getOffsetMinutes(ref.zone, now);
+
+    ref.els.hh.textContent = pad2(p.h);
+    ref.els.mm.textContent = pad2(p.mi);
+    ref.els.ss.textContent = pad2(p.s);
+
+    // Cheap fields only when the minute (or first paint) changes.
+    if (force || p.mi !== ref.last.mi || p.h !== ref.last.h) {
+      ref.els.date.textContent = dateFmt(ref.zone).format(now);
+      ref.els.offset.textContent = fmtOffset(offset);
+      ref.els.dst.hidden = !isDSTActive(ref.zone, now, offset);
+
+      if (isHomeCard) {
+        ref.els.diff.textContent = "Your local time";
+        ref.els.dayshift.hidden = true;
+      } else {
+        ref.els.diff.textContent = fmtHomeDiff(offset - homeOffset);
+        const dd = dayNumber(p) - homeDay;
+        ref.els.dayshift.hidden = dd === 0;
+        if (dd !== 0) ref.els.dayshift.textContent = (dd > 0 ? "+" : "") + dd + " day";
+      }
+
+      const day = p.h >= 6 && p.h < 18;
+      ref.cardEl.classList.toggle("is-day", day);
+      ref.cardEl.classList.toggle("is-night", !day);
+      ref.last = { h: p.h, mi: p.mi };
+    }
+  }
+}
+
+// Single shared ticker; all displays derive from one Date per tick.
+setInterval(() => {
+  const now = new Date();
+  if (now.getSeconds() !== lastSecond) {
+    lastSecond = now.getSeconds();
+    tickRender(now, false);
+    timelineTick(now);
+  }
+}, 200);
+
+/* ---------- drag and drop reorder ---------- */
+let draggedCard = null;
+
+function onDragStart(e) {
+  draggedCard = e.currentTarget;
+  draggedCard.classList.add("dragging");
+  e.dataTransfer.effectAllowed = "move";
+  try { e.dataTransfer.setData("text/plain", draggedCard.dataset.zone); } catch (err) {}
+}
+function onDragEnd() {
+  if (!draggedCard) return;
+  draggedCard.classList.remove("dragging");
+  draggedCard = null;
+  // Read the new DOM order back into state.
+  const order = [...boardEl.querySelectorAll(".card:not(.home)")].map(c => c.dataset.zone);
+  zones.sort((a, b) => order.indexOf(a.zone) - order.indexOf(b.zone));
+  saveZones();
+  refreshDerived();
+}
+boardEl.addEventListener("dragover", e => {
+  if (!draggedCard) return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect = "move";
+  const target = e.target.closest(".card");
+  if (!target || target === draggedCard || target.classList.contains("home")) return;
+  const rect = target.getBoundingClientRect();
+  const after = (e.clientX - rect.left) / rect.width > 0.5 ||
+                (e.clientY - rect.top) / rect.height > 0.65;
+  boardEl.insertBefore(draggedCard, after ? target.nextSibling : target);
+});
+boardEl.addEventListener("drop", e => { if (draggedCard) e.preventDefault(); });
+
+/* ================================================================
+   AUTOCOMPLETE SEARCH COMPONENT
+   ================================================================ */
+function attachSearch(inputEl, dropdownEl, onSelect) {
+  let results = [];
+  let activeIndex = -1;
+
+  function close() {
+    dropdownEl.classList.remove("open");
+    dropdownEl.innerHTML = "";
+    results = [];
+    activeIndex = -1;
+  }
+
+  function renderList() {
+    dropdownEl.innerHTML = "";
+    if (!results.length) {
+      const empty = document.createElement("div");
+      empty.className = "dropdown-empty";
+      empty.textContent = "No matching city or country";
+      dropdownEl.appendChild(empty);
+      dropdownEl.classList.add("open");
+      return;
+    }
+    const now = new Date();
+    results.forEach((e, i) => {
+      const item = document.createElement("div");
+      item.className = "dropdown-item" + (i === activeIndex ? " active" : "");
+      item.setAttribute("role", "option");
+      const p = zoneParts(e.zone, now);
+      const sub = subtitleFor(e);
+      const label = sub ? e.name + ", " + sub : e.name;
+      item.innerHTML =
+        '<span class="di-name">' + escapeHtml(label) + "</span>" +
+        '<span class="di-zone">' + escapeHtml(displayZone(e.zone)) + "</span>" +
+        '<span class="di-time">' + pad2(p.h) + ":" + pad2(p.mi) + "</span>";
+      item.addEventListener("mousedown", ev => {
+        ev.preventDefault();
+        pick(e);
+      });
+      dropdownEl.appendChild(item);
+    });
+    dropdownEl.classList.add("open");
+  }
+
+  function pick(entry) {
+    close();
+    onSelect(entry);
+  }
+
+  inputEl.addEventListener("input", () => {
+    const q = inputEl.value;
+    if (!q.trim()) { close(); return; }
+    results = searchPlaces(q);
+    activeIndex = results.length ? 0 : -1;
+    renderList();
+  });
+
+  inputEl.addEventListener("keydown", e => {
+    if (!dropdownEl.classList.contains("open")) return;
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      if (!results.length) return;
+      const dir = e.key === "ArrowDown" ? 1 : -1;
+      activeIndex = (activeIndex + dir + results.length) % results.length;
+      renderList();
+    } else if (e.key === "Enter") {
+      if (activeIndex >= 0 && results[activeIndex]) {
+        e.preventDefault();
+        pick(results[activeIndex]);
+      }
+    } else if (e.key === "Escape") {
+      close();
+    }
+  });
+
+  inputEl.addEventListener("blur", () => setTimeout(close, 120));
+}
+
+const addInput = document.getElementById("add-input");
+attachSearch(addInput, document.getElementById("add-dropdown"), entry => {
+  addInput.value = "";
+  addZone(entry);
+});
+
+/* ================================================================
+   TIME CONVERTER
+   ================================================================ */
+const convInput = document.getElementById("conv-input");
+const convTime = document.getElementById("conv-time");
+const convDate = document.getElementById("conv-date");
+const convResults = document.getElementById("conv-results");
+
+let convSource = (() => {
+  const label = labelForZone(HOME_ZONE);
+  return { name: label.name, country: label.country, zone: HOME_ZONE };
+})();
+
+attachSearch(convInput, document.getElementById("conv-dropdown"), entry => {
+  convSource = entry;
+  const sub = subtitleFor(entry);
+  convInput.value = sub ? entry.name + ", " + sub : entry.name;
+  renderConverter();
+});
+
+function setConverterToNow() {
+  const now = new Date();
+  const p = zoneParts(convSource.zone, now);
+  convTime.value = pad2(p.h) + ":" + pad2(p.mi);
+  convDate.value = p.y + "-" + pad2(p.mo) + "-" + pad2(p.d);
+  renderConverter();
+}
+
+document.getElementById("conv-now").addEventListener("click", setConverterToNow);
+convTime.addEventListener("input", renderConverter);
+convDate.addEventListener("input", renderConverter);
+
+function renderConverter() {
+  convResults.innerHTML = "";
+
+  const timeMatch = /^(\d{2}):(\d{2})/.exec(convTime.value || "");
+  const dateMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(convDate.value || "");
+  if (!timeMatch || !dateMatch) {
+    const hint = document.createElement("div");
+    hint.className = "conv-hint";
+    hint.textContent = "Pick a source zone and a time to see it in every zone on your board.";
+    convResults.appendChild(hint);
+    return;
+  }
+
+  const y = +dateMatch[1], mo = +dateMatch[2], d = +dateMatch[3];
+  const h = +timeMatch[1], mi = +timeMatch[2];
+  const ts = wallToUTC(convSource.zone, y, mo, d, h, mi);
+  const instant = new Date(ts);
+  const sourceDay = dayNumber(zoneParts(convSource.zone, instant));
+
+  const targets = boardTargets();
+
+  for (const t of targets) {
+    const p = zoneParts(t.zone, instant);
+    const offset = getOffsetMinutes(t.zone, instant);
+    const dd = dayNumber(p) - sourceDay;
+
+    const row = document.createElement("div");
+    row.className = "conv-row" + (t.home ? " home-row" : "");
+    row.innerHTML =
+      '<div class="conv-name">' +
+        '<div class="cn-city">' + escapeHtml(t.name) +
+          (t.home ? ' <span class="card-country">(Home)</span>' : "") + "</div>" +
+        '<div class="cn-zone">' + escapeHtml(displayZone(t.zone)) + " &middot; " + fmtOffset(offset) + "</div>" +
+      "</div>" +
+      (dd !== 0 ? '<span class="chip dayshift">' + (dd > 0 ? "+" : "") + dd + " day</span>" : "") +
+      '<div class="conv-date">' + dateFmt(t.zone).format(instant) + "</div>" +
+      '<div class="conv-time">' + pad2(p.h) + ":" + pad2(p.mi) + "</div>";
+    convResults.appendChild(row);
+  }
+}
+
+/* ================================================================
+   TIMELINE + MEETING PLANNER
+   ================================================================ */
+const ROW_H = 44, ROW_GAP = 6;
+const tlScroll = document.getElementById("tl-scroll");
+const tlContent = document.getElementById("tl-content");
+const tlNowBtn = document.getElementById("tl-now");
+const whStartInput = document.getElementById("wh-start");
+const whEndInput = document.getElementById("wh-end");
+const summaryEl = document.getElementById("overlap-summary");
+const plBarWrap = document.getElementById("pl-bar-wrap");
+const plBar = document.getElementById("pl-bar");
+const plLabels = document.getElementById("pl-bar-labels");
+const plTooltip = document.getElementById("pl-tooltip");
+const selPanel = document.getElementById("sel-panel");
+const selRowsEl = document.getElementById("sel-rows");
+const selCopyBtn = document.getElementById("sel-copy");
+const selClearBtn = document.getElementById("sel-clear");
+
+const WH_KEY = "tz-working-hours-v1";
+let workHours = { start: "09:00", end: "18:00" };
+try {
+  const rawWh = localStorage.getItem(WH_KEY);
+  if (rawWh) {
+    const parsed = JSON.parse(rawWh);
+    if (parsed && parseHM(parsed.start) !== null && parseHM(parsed.end) !== null) workHours = parsed;
+  }
+} catch (err) { /* storage unavailable */ }
+whStartInput.value = workHours.start;
+whEndInput.value = workHours.end;
+
+let PPH = 44;                 // pixels per hour on the absolute time axis
+let RANGE = null;             // {start, end} in UTC ms, home yesterday noon -> tomorrow noon
+let cursorTime = Date.now();
+let followNow = true;
+let selection = null;         // {start, end} in UTC ms
+let tlRowsMeta = [];          // { zone, tagEl }
+let cursorEl = null, selOverlayEl = null;
+let plannerData = null;       // { samples, counts, targets }
+
+const tagFmtCache = Object.create(null);
+function tagFmt(zone) {
+  if (!tagFmtCache[zone]) {
+    tagFmtCache[zone] = new Intl.DateTimeFormat("en-US", { timeZone: zone, month: "short", day: "numeric" });
+  }
+  return tagFmtCache[zone];
+}
+const dowFmtCache = Object.create(null);
+function dowFmt(zone) {
+  if (!dowFmtCache[zone]) {
+    dowFmtCache[zone] = new Intl.DateTimeFormat("en-US", { timeZone: zone, weekday: "short", month: "short", day: "numeric" });
+  }
+  return dowFmtCache[zone];
+}
+
+function xOfTime(t) { return (t - RANGE.start) / 3600000 * PPH; }
+function timeAtX(x) { return RANGE.start + x / PPH * 3600000; }
+function clampTime(t) { return Math.min(Math.max(t, RANGE.start), RANGE.end); }
+function snap15(t) { return Math.round(t / 900000) * 900000; }
+
+function refreshDerived() {
+  renderConverter();
+  buildTimeline();
+  renderPlanner();
+}
+
+/* ---------- timeline build (only on zone/range/size changes) ---------- */
+function buildTimeline() {
+  const now = new Date();
+  const hp = zoneParts(HOME_ZONE, now);
+  const noon = wallToUTC(HOME_ZONE, hp.y, hp.mo, hp.d, 12, 0);
+  RANGE = { start: noon - 24 * 3600000, end: noon + 24 * 3600000 };
+  PPH = window.innerWidth < 640 ? 34 : 44;
+  const labelEvery = window.innerWidth < 640 ? 6 : 3;
+  const width = 48 * PPH;
+
+  tlContent.innerHTML = "";
+  tlContent.style.width = width + "px";
+  tlRowsMeta = [];
+
+  for (const tgt of boardTargets()) {
+    const row = document.createElement("div");
+    row.className = "tl-row" + (tgt.home ? " tl-home" : "");
+    const strip = document.createElement("div");
+    strip.className = "tl-strip";
+
+    // Walk the zone's local hour boundaries across the absolute range so the
+    // same instant lines up vertically in every row (offsets included), and
+    // label each cell from Intl so DST days stay exact.
+    const fp = zoneParts(tgt.zone, new Date(RANGE.start));
+    let t = wallToUTC(tgt.zone, fp.y, fp.mo, fp.d, fp.h, 0);
+    let prevDay = dayNumber(fp);
+    let firstCell = true;
+    while (t < RANGE.end) {
+      const next = t + 3600000;
+      const mid = new Date(t + 1800000);
+      const p = zoneParts(tgt.zone, mid);
+      const x0 = Math.max(xOfTime(t), 0);
+      const x1 = Math.min(xOfTime(next), width);
+      if (x1 <= x0) { t = next; continue; }
+      const cell = document.createElement("div");
+      const h = p.h;
+      const period = (h >= 9 && h < 18) ? "c-work"
+        : ((h >= 7 && h < 9) || (h >= 18 && h < 23)) ? "c-shoulder" : "c-night";
+      cell.className = "tl-cell " + period;
+      cell.style.left = x0 + "px";
+      cell.style.width = (x1 - x0) + "px";
+      const dayN = dayNumber(p);
+      if (!firstCell && dayN !== prevDay) {
+        cell.classList.add("day-start");
+        const dl = document.createElement("span");
+        dl.className = "tl-day-label";
+        dl.textContent = dowFmt(tgt.zone).format(mid);
+        cell.appendChild(dl);
+      }
+      if (h % labelEvery === 0 && x1 - x0 > PPH * 0.7) {
+        const hl = document.createElement("span");
+        hl.className = "tl-hour-label";
+        hl.textContent = pad2(h);
+        cell.appendChild(hl);
+      }
+      strip.appendChild(cell);
+      prevDay = dayN;
+      firstCell = false;
+      t = next;
+    }
+
+    const label = document.createElement("span");
+    label.className = "tl-row-label";
+    label.textContent = tgt.name + (tgt.home ? " (Home)" : "");
+    row.appendChild(strip);
+    row.appendChild(label);
+    tlContent.appendChild(row);
+    tlRowsMeta.push({ zone: tgt.zone, tagEl: null });
+  }
+
+  selOverlayEl = document.createElement("div");
+  selOverlayEl.className = "tl-selection";
+  tlContent.appendChild(selOverlayEl);
+
+  cursorEl = document.createElement("div");
+  cursorEl.className = "tl-cursor";
+  cursorEl.innerHTML = '<div class="tl-cursor-line"></div><div class="tl-cursor-hit"></div>';
+  tlRowsMeta.forEach((meta, i) => {
+    const tag = document.createElement("div");
+    tag.className = "tl-cursor-tag";
+    tag.style.top = (i * (ROW_H + ROW_GAP) + ROW_H / 2) + "px";
+    cursorEl.appendChild(tag);
+    meta.tagEl = tag;
+  });
+  tlContent.appendChild(cursorEl);
+  attachCursorDrag(cursorEl.querySelector(".tl-cursor-hit"));
+
+  if (followNow) cursorTime = Date.now();
+  cursorTime = clampTime(cursorTime);
+  positionCursor();
+  updateCursorTags();
+  renderSelection();
+
+  tlScroll.scrollLeft = xOfTime(cursorTime) - tlScroll.clientWidth / 2;
+}
+
+/* ---------- cursor (transform + label text only, via rAF) ---------- */
+function positionCursor() {
+  if (!cursorEl || !RANGE) return;
+  const x = xOfTime(cursorTime);
+  cursorEl.style.transform = "translateX(" + x + "px)";
+  cursorEl.classList.toggle("flip", x > 48 * PPH - 140);
+}
+function updateCursorTags() {
+  if (!RANGE) return;
+  const d = new Date(cursorTime);
+  for (const meta of tlRowsMeta) {
+    const p = zoneParts(meta.zone, d);
+    meta.tagEl.textContent = pad2(p.h) + ":" + pad2(p.mi) + " · " + tagFmt(meta.zone).format(d);
+  }
+}
+let cursorRaf = 0;
+function scheduleCursorRender() {
+  if (cursorRaf) return;
+  cursorRaf = requestAnimationFrame(() => {
+    cursorRaf = 0;
+    positionCursor();
+    updateCursorTags();
+  });
+}
+
+function attachCursorDrag(hit) {
+  hit.addEventListener("pointerdown", e => {
+    e.preventDefault();
+    e.stopPropagation();
+    followNow = false;
+    hit.setPointerCapture(e.pointerId);
+    const move = ev => {
+      const rect = tlContent.getBoundingClientRect();
+      cursorTime = clampTime(timeAtX(ev.clientX - rect.left));
+      scheduleCursorRender();
+    };
+    const end = () => {
+      hit.removeEventListener("pointermove", move);
+      hit.removeEventListener("pointerup", end);
+      hit.removeEventListener("pointercancel", end);
+    };
+    hit.addEventListener("pointermove", move);
+    hit.addEventListener("pointerup", end);
+    hit.addEventListener("pointercancel", end);
+  });
+}
+
+tlContent.addEventListener("dblclick", e => {
+  if (!RANGE) return;
+  const rect = tlContent.getBoundingClientRect();
+  cursorTime = clampTime(timeAtX(e.clientX - rect.left));
+  followNow = false;
+  scheduleCursorRender();
+});
+
+tlNowBtn.addEventListener("click", () => {
+  followNow = true;
+  cursorTime = Date.now();
+  if (!RANGE || cursorTime < RANGE.start + 3600000 || cursorTime > RANGE.end - 3600000) {
+    buildTimeline();
+  } else {
+    positionCursor();
+    updateCursorTags();
+    tlScroll.scrollTo({ left: xOfTime(cursorTime) - tlScroll.clientWidth / 2, behavior: "smooth" });
+  }
+});
+
+let lastHomeDayNum = null;
+function timelineTick(now) {
+  if (!RANGE) return;
+  const hd = dayNumber(zoneParts(HOME_ZONE, now));
+  if (lastHomeDayNum === null) {
+    lastHomeDayNum = hd;
+  } else if (hd !== lastHomeDayNum) {
+    lastHomeDayNum = hd;
+    buildTimeline();
+    renderPlanner();
+    return;
+  }
+  if (followNow) {
+    cursorTime = now.getTime();
+    positionCursor();
+    updateCursorTags();
+  }
+}
+
+/* ---------- drag-select a range on the timeline (mouse/pen) ---------- */
+let selDrag = null, selRaf = 0;
+tlContent.addEventListener("pointerdown", e => {
+  if (!RANGE || e.pointerType === "touch" || e.button !== 0) return;
+  if (e.target.closest(".tl-cursor-hit")) return;
+  const rect = tlContent.getBoundingClientRect();
+  selDrag = { x0: e.clientX - rect.left, id: e.pointerId, moved: false };
+});
+window.addEventListener("pointermove", e => {
+  if (!selDrag || e.pointerId !== selDrag.id) return;
+  const rect = tlContent.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  if (!selDrag.moved) {
+    if (Math.abs(x - selDrag.x0) < 6) return;
+    selDrag.moved = true;
+    try { tlContent.setPointerCapture(selDrag.id); } catch (err) {}
+  }
+  let a = clampTime(snap15(timeAtX(Math.min(selDrag.x0, x))));
+  let b = clampTime(snap15(timeAtX(Math.max(selDrag.x0, x))));
+  if (b - a < 900000) b = Math.min(a + 900000, RANGE.end);
+  selection = { start: a, end: b };
+  if (!selRaf) {
+    selRaf = requestAnimationFrame(() => { selRaf = 0; renderSelection(); });
+  }
+});
+window.addEventListener("pointerup", e => {
+  if (!selDrag || e.pointerId !== selDrag.id) return;
+  selDrag = null;
+});
+
+function renderSelection() {
+  if (!selOverlayEl) return;
+  if (!selection) {
+    selOverlayEl.style.display = "none";
+    selPanel.classList.remove("open");
+    return;
+  }
+  selOverlayEl.style.display = "block";
+  selOverlayEl.style.left = xOfTime(selection.start) + "px";
+  selOverlayEl.style.width = (xOfTime(selection.end) - xOfTime(selection.start)) + "px";
+  renderSelectionPanel();
+}
+
+function renderSelectionPanel() {
+  selRowsEl.innerHTML = "";
+  const s = new Date(selection.start), en = new Date(selection.end);
+  const homeDay = dayNumber(zoneParts(HOME_ZONE, s));
+  for (const tgt of boardTargets()) {
+    const p0 = zoneParts(tgt.zone, s), p1 = zoneParts(tgt.zone, en);
+    const dd = dayNumber(p0) - homeDay;
+    const sameDay = dayNumber(p0) === dayNumber(p1);
+    const range = dowFmt(tgt.zone).format(s) + ", " + pad2(p0.h) + ":" + pad2(p0.mi) +
+      (sameDay
+        ? "-" + pad2(p1.h) + ":" + pad2(p1.mi)
+        : " to " + dowFmt(tgt.zone).format(en) + ", " + pad2(p1.h) + ":" + pad2(p1.mi));
+    const row = document.createElement("div");
+    row.className = "sel-row" + (tgt.home ? " home-row" : "");
+    row.innerHTML =
+      '<span class="sel-name">' + escapeHtml(tgt.name) + (tgt.home ? ' <span class="card-country">(Home)</span>' : "") + "</span>" +
+      (dd !== 0 ? '<span class="chip dayshift">' + (dd > 0 ? "+" : "") + dd + " day</span>" : "") +
+      '<span class="sel-range">' + escapeHtml(range) + "</span>";
+    selRowsEl.appendChild(row);
+  }
+  selPanel.classList.add("open");
+}
+
+function selCopyText() {
+  const s = new Date(selection.start), en = new Date(selection.end);
+  const homeDay = dayNumber(zoneParts(HOME_ZONE, s));
+  const parts = boardTargets().map(tgt => {
+    const p0 = zoneParts(tgt.zone, s), p1 = zoneParts(tgt.zone, en);
+    const time = pad2(p0.h) + ":" + pad2(p0.mi) + "-" + pad2(p1.h) + ":" + pad2(p1.mi);
+    const needDate = tgt.home || dayNumber(p0) !== homeDay;
+    const date = needDate ? dowFmt(tgt.zone).format(s).replace(",", "") + ", " : "";
+    return date + time + " " + tgt.name;
+  });
+  return "Meeting: " + parts.join(" / ");
+}
+
+selCopyBtn.addEventListener("click", () => {
+  if (!selection) return;
+  const text = selCopyText();
+  const done = () => {
+    selCopyBtn.textContent = "Copied";
+    setTimeout(() => { selCopyBtn.textContent = "Copy"; }, 1400);
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(done).catch(() => fallbackCopy(text, done));
+  } else {
+    fallbackCopy(text, done);
+  }
+});
+function fallbackCopy(text, done) {
+  const ta = document.createElement("textarea");
+  ta.value = text;
+  ta.style.position = "fixed";
+  ta.style.opacity = "0";
+  document.body.appendChild(ta);
+  ta.select();
+  try { document.execCommand("copy"); done(); } catch (err) {}
+  ta.remove();
+}
+selClearBtn.addEventListener("click", () => {
+  selection = null;
+  renderSelection();
+});
+
+/* ---------- overlap bar + summary ---------- */
+let ttPinned = -1;
+function renderPlanner() {
+  const targets = boardTargets();
+  const n = targets.length;
+  const ws = parseHM(workHours.start), we = parseHM(workHours.end);
+  const data = overlapForDay(targets.map(t => t.zone), HOME_ZONE, new Date(), ws, we);
+  plannerData = { samples: data.samples, counts: data.counts, targets };
+
+  plBar.innerHTML = "";
+  plLabels.innerHTML = "";
+  const labelEvery = window.innerWidth < 640 ? 6 : 3;
+  for (let H = 0; H < 24; H++) {
+    const seg = document.createElement("div");
+    const c = data.counts[H];
+    const lvl = c === 0 ? "ov-none" : c === n ? "ov-full" : c > n / 2 ? "ov-most" : "ov-some";
+    seg.className = "ov-seg " + lvl;
+    seg.style.left = (H / 24 * 100) + "%";
+    seg.style.width = (100 / 24) + "%";
+    seg.addEventListener("mouseenter", () => { if (ttPinned < 0) showTooltip(H); });
+    seg.addEventListener("click", ev => {
+      ev.stopPropagation();
+      if (ttPinned === H) { ttPinned = -1; hideTooltip(); }
+      else { ttPinned = H; showTooltip(H); }
+    });
+    plBar.appendChild(seg);
+    if (H % labelEvery === 0) {
+      const lb = document.createElement("span");
+      lb.textContent = pad2(H);
+      lb.style.left = (H / 24 * 100) + "%";
+      plLabels.appendChild(lb);
+    }
+  }
+
+  const { max, wins } = bestWindows(data.counts);
+  if (!wins.length) {
+    summaryEl.textContent = "No working-hours overlap today.";
+  } else {
+    const fmtWin = w => pad2(w[0]) + ":00-" + (w[1] === 24 ? "24:00" : pad2(w[1]) + ":00");
+    const shown = wins.slice(0, 2).map(fmtWin).join(" and ");
+    if (max === n) {
+      summaryEl.textContent = "Best overlap: " + shown + " your time (" + n + " of " + n + " zones)";
+    } else {
+      const out = targets.filter(t => !inWorkingWindow(t.zone, data.samples[wins[0][0]], ws, we)).map(t => t.name);
+      summaryEl.textContent = "Best partial overlap: " + shown + " your time (" + max + " of " + n +
+        " zones, " + out.join(", ") + " out)";
+    }
+  }
+  if (ttPinned >= 0) { ttPinned = -1; hideTooltip(); }
+}
+
+function showTooltip(H) {
+  if (!plannerData) return;
+  const ws = parseHM(workHours.start), we = parseHM(workHours.end);
+  const t = plannerData.samples[H];
+  const d = new Date(t);
+  let html = '<div class="tt-title">' + pad2(H) + ":00-" + (H + 1 === 24 ? "24:00" : pad2(H + 1) + ":00") + " your time</div>";
+  for (const tgt of plannerData.targets) {
+    const p = zoneParts(tgt.zone, d);
+    const ok = inWorkingWindow(tgt.zone, t, ws, we);
+    html += '<div class="tt-row"><span class="mark ' + (ok ? "mark-yes" : "mark-no") + '"></span>' +
+      "<span>" + escapeHtml(tgt.name) + "</span>" +
+      '<span class="tt-time">' + pad2(p.h) + ":" + pad2(p.mi) + "</span></div>";
+  }
+  plTooltip.innerHTML = html;
+  plTooltip.style.display = "block";
+  const w = plBarWrap.clientWidth;
+  const x = (H + 0.5) / 24 * w;
+  const tw = plTooltip.offsetWidth || 220;
+  plTooltip.style.left = Math.min(Math.max(x - tw / 2, 0), Math.max(w - tw, 0)) + "px";
+}
+function hideTooltip() { plTooltip.style.display = "none"; }
+plBarWrap.addEventListener("mouseleave", () => { if (ttPinned < 0) hideTooltip(); });
+document.addEventListener("click", e => {
+  if (ttPinned >= 0 && !e.target.closest("#pl-bar-wrap")) {
+    ttPinned = -1;
+    hideTooltip();
+  }
+});
+
+function onWorkHoursChange() {
+  const s = parseHM(whStartInput.value), e = parseHM(whEndInput.value);
+  if (s === null || e === null) return;
+  workHours = { start: whStartInput.value, end: whEndInput.value };
+  try { localStorage.setItem(WH_KEY, JSON.stringify(workHours)); } catch (err) {}
+  renderPlanner();
+}
+whStartInput.addEventListener("input", onWorkHoursChange);
+whEndInput.addEventListener("input", onWorkHoursChange);
+
+let resizeTimer = 0;
+window.addEventListener("resize", () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    buildTimeline();
+    renderPlanner();
+  }, 200);
+});
+
+/* ================================================================
+   INIT
+   ================================================================ */
+convInput.value = convSource.country ? convSource.name + ", " + convSource.country : convSource.name;
+renderBoard();
+setConverterToNow();
+
+// PWA: register the service worker only over http(s) so plain file:// use
+// keeps working unchanged.
+if ("serviceWorker" in navigator && (location.protocol === "https:" || location.protocol === "http:")) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("sw.js").catch(() => { /* offline install is best-effort */ });
+  });
+}
+</script>
+</body>
+</html>
