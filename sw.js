@@ -1,6 +1,6 @@
 "use strict";
 
-const CACHE = "tz-app-v1";
+const CACHE = "tz-app-v2";
 const ASSETS = [
   "./",
   "./index.html",

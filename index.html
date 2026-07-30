@@ -717,25 +717,54 @@ const COUNTRY_ALIASES = [
   ["Samoa", "Pacific/Apia"], ["New Caledonia", "Pacific/Noumea"]
 ];
 
-// Common timezone abbreviations -> a representative zone.
+// Common timezone abbreviations: [abbr, full name, zone]. An exact query
+// on the abbreviation renders as "ET (Eastern Time) -> New York" in the
+// dropdown. Ambiguous abbreviations (IST) list every zone worth
+// suggesting, primary mapping first.
 const ZONE_ABBREVIATIONS = [
-  ["CET", "Europe/Paris"], ["CEST", "Europe/Paris"],
-  ["WET", "Europe/Lisbon"], ["EET", "Europe/Athens"],
-  ["BST", "Europe/London"], ["MSK", "Europe/Moscow"],
-  ["GMT", "Etc/GMT"],
-  ["EST", "America/New_York"], ["EDT", "America/New_York"],
-  ["CST", "America/Chicago"], ["CDT", "America/Chicago"],
-  ["MST", "America/Denver"], ["MDT", "America/Denver"],
-  ["PST", "America/Los_Angeles"], ["PDT", "America/Los_Angeles"],
-  ["AKST", "America/Anchorage"], ["HST", "Pacific/Honolulu"],
-  ["AST", "America/Halifax"],
-  ["IST", "Asia/Kolkata"], ["JST", "Asia/Tokyo"],
-  ["KST", "Asia/Seoul"], ["HKT", "Asia/Hong_Kong"],
-  ["SGT", "Asia/Singapore"], ["ICT", "Asia/Bangkok"],
-  ["GST", "Asia/Dubai"],
-  ["AEST", "Australia/Sydney"], ["AEDT", "Australia/Sydney"],
-  ["ACST", "Australia/Adelaide"], ["AWST", "Australia/Perth"],
-  ["NZST", "Pacific/Auckland"], ["NZDT", "Pacific/Auckland"]
+  ["ET", "Eastern Time", "America/New_York"],
+  ["EST", "Eastern Standard Time", "America/New_York"],
+  ["EDT", "Eastern Daylight Time", "America/New_York"],
+  ["CT", "Central Time", "America/Chicago"],
+  ["CST", "Central Standard Time", "America/Chicago"],
+  ["CDT", "Central Daylight Time", "America/Chicago"],
+  ["MT", "Mountain Time", "America/Denver"],
+  ["MST", "Mountain Standard Time", "America/Denver"],
+  ["MDT", "Mountain Daylight Time", "America/Denver"],
+  ["PT", "Pacific Time", "America/Los_Angeles"],
+  ["PST", "Pacific Standard Time", "America/Los_Angeles"],
+  ["PDT", "Pacific Daylight Time", "America/Los_Angeles"],
+  ["AKST", "Alaska Standard Time", "America/Anchorage"],
+  ["HST", "Hawaii Standard Time", "Pacific/Honolulu"],
+  ["AST", "Atlantic Standard Time", "America/Halifax"],
+  ["GMT", "Greenwich Mean Time", "Europe/London"],
+  ["BST", "British Summer Time", "Europe/London"],
+  ["WET", "Western European Time", "Europe/Lisbon"],
+  ["CET", "Central European Time", "Europe/Paris"],
+  ["CEST", "Central European Summer Time", "Europe/Paris"],
+  ["EET", "Eastern European Time", "Europe/Helsinki"],
+  ["EEST", "Eastern European Summer Time", "Europe/Helsinki"],
+  ["MSK", "Moscow Time", "Europe/Moscow"],
+  ["GST", "Gulf Standard Time", "Asia/Dubai"],
+  ["IST", "India Standard Time", "Asia/Kolkata"],
+  ["IST", "Israel Standard Time", "Asia/Jerusalem"],
+  ["IST", "Irish Standard Time", "Europe/Dublin"],
+  ["ICT", "Indochina Time", "Asia/Bangkok"],
+  ["SGT", "Singapore Time", "Asia/Singapore"],
+  ["HKT", "Hong Kong Time", "Asia/Hong_Kong"],
+  ["JST", "Japan Standard Time", "Asia/Tokyo"],
+  ["KST", "Korea Standard Time", "Asia/Seoul"],
+  ["AEST", "Australian Eastern Standard Time", "Australia/Sydney"],
+  ["AEDT", "Australian Eastern Daylight Time", "Australia/Sydney"],
+  ["ACST", "Australian Central Standard Time", "Australia/Adelaide"],
+  ["AWST", "Australian Western Standard Time", "Australia/Perth"],
+  ["NZST", "New Zealand Standard Time", "Pacific/Auckland"],
+  ["NZDT", "New Zealand Daylight Time", "Pacific/Auckland"],
+  ["WAT", "West Africa Time", "Africa/Lagos"],
+  ["EAT", "East Africa Time", "Africa/Nairobi"],
+  ["SAST", "South Africa Standard Time", "Africa/Johannesburg"],
+  ["BRT", "Brasilia Time", "America/Sao_Paulo"],
+  ["ART", "Argentina Time", "America/Argentina/Buenos_Aires"]
 ];
 
 /* ================================================================
@@ -931,16 +960,16 @@ const INDEX = (() => {
     }
   } catch (err) { /* fall back to curated zones below */ }
   if (!ianaZones.length) {
-    ianaZones = [...new Set(COUNTRY_ALIASES.concat(ZONE_ABBREVIATIONS).map(a => a[1]))];
+    ianaZones = [...new Set(COUNTRY_ALIASES.map(a => a[1]).concat(ZONE_ABBREVIATIONS.map(a => a[2])))];
   }
   for (const zone of ianaZones) {
     // Etc/* and bare ids are covered by the explicit UTC entries below.
     if (zone.startsWith("Etc/") || !zone.includes("/")) continue;
-    if (!validZone(zone)) continue;
+    if (!validZone(zone) || byZone.has(zone)) continue;
     const segs = zone.split("/");
     add({
       name: segs[segs.length - 1].replace(/_/g, " "),
-      country: segs[0].replace(/_/g, " "),
+      country: segs.slice(0, -1).join("/").replace(/_/g, " "),
       zone, aliases: [], order: 500, hasCountry: false
     });
   }
@@ -974,7 +1003,7 @@ const INDEX = (() => {
       e.aliases.push(norm(label));
     }
   }
-  for (const [abbr, zone] of ZONE_ABBREVIATIONS) {
+  for (const [abbr, , zone] of ZONE_ABBREVIATIONS) {
     if (!validZone(zone)) continue;
     const e = resolve(zone);
     if (!e) {
@@ -993,21 +1022,41 @@ const INDEX = (() => {
   return entries;
 })();
 
+// Abbreviation records resolved to their index entries, for the exact-match
+// search tier and the "ET (Eastern Time) -> New York" dropdown rendering.
+const ABBR_INDEX = ZONE_ABBREVIATIONS.map(([abbr, full, zone]) => {
+  const entry = INDEX.find(e => e.zone === zone) ||
+                INDEX.find(e => canonicalZone(e.zone) === canonicalZone(zone));
+  return entry ? { abbr, full, nAbbr: norm(abbr), entry } : null;
+}).filter(Boolean);
+
+// Results are { entry, alias } records, at most 12, ranked: exact
+// abbreviation match, then label prefix, then country/alias prefix, then
+// substring anywhere. Deduped by zone; the best-ranked hit wins.
 function searchPlaces(query) {
   const q = norm(query.trim());
   if (!q) return [];
-  const scored = [];
+  const best = new Map();
+  const consider = (entry, score, alias, seq) => {
+    const cur = best.get(entry.zone);
+    if (!cur || score < cur.score) {
+      best.set(entry.zone, { entry, score, alias: alias || null, seq: seq || 0 });
+    }
+  };
+  ABBR_INDEX.forEach((a, i) => { if (a.nAbbr === q) consider(a.entry, 0, a, i); });
   for (const e of INDEX) {
     let score = -1;
-    if (e.nName.startsWith(q)) score = 0;
-    else if (e.nCountry.startsWith(q) || e.aliases.some(a => a.startsWith(q))) score = 1;
+    if (e.nName.startsWith(q)) score = 1;
+    else if (e.nCountry.startsWith(q) || e.aliases.some(a => a.startsWith(q))) score = 2;
     else if (e.nName.includes(q) || e.nCountry.includes(q) || e.nZone.includes(q) ||
-             e.aliases.some(a => a.includes(q))) score = 2;
-    if (score >= 0) scored.push({ e, score });
+             e.aliases.some(a => a.includes(q))) score = 3;
+    if (score >= 0) consider(e, score);
   }
-  scored.sort((a, b) =>
-    a.score - b.score || a.e.order - b.e.order || a.e.name.localeCompare(b.e.name));
-  return scored.slice(0, 12).map(s => s.e);
+  const hits = [...best.values()];
+  hits.sort((a, b) =>
+    a.score - b.score || a.seq - b.seq ||
+    a.entry.order - b.entry.order || a.entry.name.localeCompare(b.entry.name));
+  return hits.slice(0, 12);
 }
 
 // Secondary line for an entry: its country if known, else its region;
@@ -1285,29 +1334,32 @@ function attachSearch(inputEl, dropdownEl, onSelect) {
       return;
     }
     const now = new Date();
-    results.forEach((e, i) => {
+    results.forEach((r, i) => {
+      const e = r.entry;
       const item = document.createElement("div");
       item.className = "dropdown-item" + (i === activeIndex ? " active" : "");
       item.setAttribute("role", "option");
       const p = zoneParts(e.zone, now);
       const sub = subtitleFor(e);
-      const label = sub ? e.name + ", " + sub : e.name;
+      const label = r.alias
+        ? r.alias.abbr + " (" + r.alias.full + ") → " + e.name
+        : (sub ? e.name + ", " + sub : e.name);
       item.innerHTML =
         '<span class="di-name">' + escapeHtml(label) + "</span>" +
         '<span class="di-zone">' + escapeHtml(displayZone(e.zone)) + "</span>" +
         '<span class="di-time">' + pad2(p.h) + ":" + pad2(p.mi) + "</span>";
       item.addEventListener("mousedown", ev => {
         ev.preventDefault();
-        pick(e);
+        pick(r);
       });
       dropdownEl.appendChild(item);
     });
     dropdownEl.classList.add("open");
   }
 
-  function pick(entry) {
+  function pick(hit) {
     close();
-    onSelect(entry);
+    onSelect(hit.entry);
   }
 
   inputEl.addEventListener("input", () => {
